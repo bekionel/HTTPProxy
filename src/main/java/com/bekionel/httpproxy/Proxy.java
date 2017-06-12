@@ -6,13 +6,19 @@
 package com.bekionel.httpproxy;
 
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.util.Enumeration;
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import org.apache.http.Header;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
 
 /**
  *
@@ -44,20 +50,32 @@ public class Proxy extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        
         Enumeration<String> headersEnum = request.getHeaderNames();
+        HttpGet getReq = new HttpGet("http://localhost:55555");
         while (headersEnum.hasMoreElements()){
             String header=headersEnum.nextElement();
-            System.out.println(header+": "+request.getHeader(header));
+            //System.out.println(header+": "+request.getHeader(header));
+            getReq.addHeader(header,request.getHeader(header));
+            
+            
         }
-        
+        try {
+                CloseableHttpResponse srvResponse = sendGet(getReq);
+                Header[] srvHeaderz = srvResponse.getAllHeaders();
+                for (Header hdr : srvHeaderz) {
+                    response.addHeader(hdr.getName(), hdr.getValue());
+                }
+                
+            } catch (IOException ex) {
+                Logger.getLogger(Proxy.class.getName()).log(Level.SEVERE, null, ex);
+            }
     }
 
     /**
      * Handles the HTTP <code>POST</code> method.
      *
      * @param request servlet requestnu
-m     * @param response servlet response
+     * @param response servlet response
      * @throws ServletException if a servlet-specific error occurs
      * @throws IOException if an I/O error occurs
      */
@@ -76,5 +94,14 @@ m     * @param response servlet response
     public String getServletInfo() {
         return "Short description";
     }// </editor-fold>
+    
+    
+    
+    public CloseableHttpResponse sendGet(HttpGet httpGet) throws IOException {
+        
+                CloseableHttpClient httpClient = HttpClients.createDefault();
+                CloseableHttpResponse response = httpClient.execute(httpGet);
+                return response;
+	}
 
 }
