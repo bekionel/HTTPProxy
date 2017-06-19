@@ -6,6 +6,8 @@
 package com.bekionel.httpproxy;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.Enumeration;
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
@@ -14,11 +16,20 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.apache.commons.io.IOUtils;
 import org.apache.http.Header;
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpHost;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.ResponseHandler;
+import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.BasicResponseHandler;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
+
 
 /**
  *
@@ -50,25 +61,44 @@ public class Proxy extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        Enumeration<String> headersEnum = request.getHeaderNames();
-        HttpGet getReq = new HttpGet("http://localhost:55555");
-        while (headersEnum.hasMoreElements()){
-            String header=headersEnum.nextElement();
-            //System.out.println(header+": "+request.getHeader(header));
-            getReq.addHeader(header,request.getHeader(header));
-            
-            
-        }
+        String fullRequestUrl = "http://"+request.getHeader("Host")+request.getContextPath()+"/";
+        String hostAddr = request.getHeader("Host");
+     CloseableHttpClient httpclient = HttpClients.createDefault();
+    try {
+        HttpHost target = new HttpHost(hostAddr);
+        HttpHost proxy = new HttpHost("127.0.0.1", 8080, "http");
+        System.out.println(hostAddr+"\n"+fullRequestUrl+"\n");
+
+        RequestConfig config = RequestConfig.custom()
+                .build();
+        HttpGet req = new HttpGet(request.getContextPath()+"/");
+        req.setConfig(config);
+
+        System.out.println("Executing request " + req.getRequestLine() + " to " + target + " via " + proxy);
+
+        CloseableHttpResponse resp = httpclient.execute(target, req);
         try {
-                CloseableHttpResponse srvResponse = sendGet(getReq);
-                Header[] srvHeaderz = srvResponse.getAllHeaders();
-                for (Header hdr : srvHeaderz) {
-                    response.addHeader(hdr.getName(), hdr.getValue());
-                }
-                
-            } catch (IOException ex) {
-                Logger.getLogger(Proxy.class.getName()).log(Level.SEVERE, null, ex);
+            Header[] headz = resp.getAllHeaders();
+             System.out.println("Printing headerz fo " +req.getRequestLine()+ "to "+ target);
+            for (Header hd : headz){
+               System.out.println(hd.toString());
             }
+            System.out.println("----------------------------------------");
+            System.out.println(resp.getStatusLine());
+            HttpEntity respEntity = resp.getEntity();
+            OutputStream out = response.getOutputStream();
+            InputStream in = respEntity.getContent();
+            IOUtils.copy(in,out);
+            in.close();
+            out.close();
+//            buffer
+//            inputStream.
+        } finally {
+            resp.close();
+        }
+    } finally {
+        httpclient.close();
+    }
     }
 
     /**
