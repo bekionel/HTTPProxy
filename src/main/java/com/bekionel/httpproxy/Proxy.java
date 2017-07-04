@@ -8,27 +8,19 @@ package com.bekionel.httpproxy;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.Enumeration;
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.apache.commons.io.IOUtils;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpHost;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.ResponseHandler;
-import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.BasicResponseHandler;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
-import org.apache.http.util.EntityUtils;
 
 
 /**
@@ -61,28 +53,30 @@ public class Proxy extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        String fullRequestUrl = "http://"+request.getHeader("Host")+request.getContextPath()+"/";
+        String fullRequestUrl = "http://"+request.getHeader("Host")+request.getRequestURI();
         String hostAddr = request.getHeader("Host");
-     CloseableHttpClient httpclient = HttpClients.createDefault();
+        CloseableHttpClient httpclient = HttpClients.createDefault();
     try {
         HttpHost target = new HttpHost(hostAddr);
+        
         HttpHost proxy = new HttpHost("127.0.0.1", 8080, "http");
         System.out.println(hostAddr+"\n"+fullRequestUrl+"\n");
 
-        RequestConfig config = RequestConfig.custom()
-                .build();
-        HttpGet req = new HttpGet(request.getContextPath()+"/");
-        req.setConfig(config);
+        //RequestConfig config = RequestConfig.custom().build();
+        HttpGet req = new HttpGet(request.getRequestURI());
+        //req.setConfig(config);
+        
 
-        System.out.println("Executing request " + req.getRequestLine() + " to " + target + " via " + proxy);
+        System.out.println("Executing request " + req.toString() + " to " + target);
 
         CloseableHttpResponse resp = httpclient.execute(target, req);
+        System.out.println("Servlet request path "+ request.getRequestURI());
         try {
             Header[] headz = resp.getAllHeaders();
-             System.out.println("Printing headerz fo " +req.getRequestLine()+ "to "+ target);
-            for (Header hd : headz){
+            //System.out.println("Printing headerz fo " +req.getRequestLine()+ " to "+ target);
+            /*for (Header hd : headz){
                System.out.println(hd.toString());
-            }
+            }*/
             System.out.println("----------------------------------------");
             System.out.println(resp.getStatusLine());
             HttpEntity respEntity = resp.getEntity();
