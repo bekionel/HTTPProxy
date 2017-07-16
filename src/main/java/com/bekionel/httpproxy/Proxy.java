@@ -14,14 +14,13 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.io.IOUtils;
-import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpHost;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
-import com.bekionel.httpproxy.CachePolicyConfig;
+import org.apache.log4j.Logger;
 
 
 /**
@@ -30,7 +29,6 @@ import com.bekionel.httpproxy.CachePolicyConfig;
  */
 @WebServlet(name = "Proxy", urlPatterns = {"/"})
 public class Proxy extends HttpServlet {
-
     /**
      * Processes requests for both HTTP <code>GET</code> and <code>POST</code>
      * methods.
@@ -41,8 +39,8 @@ public class Proxy extends HttpServlet {
      * @throws IOException if an I/O error occurs
      */
 
+            private static final Logger proxyLogger = Logger.getLogger("Proxy Submodule");
 
-    // <editor-fold defaultstate="collapsed" desc="HttpServlet methods. Click on the + sign on the left to edit the code.">
     /**
      * Handles the HTTP <code>GET</code> method.
      *
@@ -55,30 +53,33 @@ public class Proxy extends HttpServlet {
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         boolean eligibleForCaching = false;
+        proxyLogger.debug("Entering doGet");
         String fullRequestUrl = "http://"+request.getHeader("Host")+request.getRequestURI();
         String hostAddr = request.getHeader("Host");
         CloseableHttpClient httpclient = HttpClients.createDefault();
     try {
         HttpHost target = new HttpHost(hostAddr);
             String requestString = request.getRequestURI().toString();
-            System.out.println("Split: "+requestString);
             int dotIndex = requestString.lastIndexOf(".");
-            System.out.println("DotIndex: " + dotIndex);
             if (dotIndex > 0){
             String extension = requestString.substring(dotIndex + 1);
-            System.out.println("Extension: " + extension);
+            proxyLogger.debug("Object extension: "+ extension);
             if (CachePolicyConfig.objectEligibleForCaching(extension)){
                 eligibleForCaching = true;
-                System.out.println("Eligible for caching");
+                proxyLogger.debug("Request string "+requestString+"\n Eligible for caching: "+ eligibleForCaching);
+                }
             }
-            }
-            
-        System.out.println(hostAddr+"\n"+fullRequestUrl+"\n");
+        //System.out.println(hostAddr+"\n"+fullRequestUrl+"\n");
         //Request to server starts here
         HttpGet req = new HttpGet(request.getRequestURI());
-        System.out.println("Executing request " + req.toString() + " to " + target);
+        proxyLogger.debug("Executing request " + req.toString() + " to " + target);
         CloseableHttpResponse resp = httpclient.execute(target, req);
-        System.out.println("Servlet request path "+ request.getRequestURI());
+        proxyLogger.debug("Servlet request path "+ request.getRequestURI());
+
+        //Request sent, reading body from InputStream
+        //TODO: Change transparent copy policy of InputStream to OutputStream.
+        //      Add policy for storing caching eligible object to cache based
+        //      on CachePolicyConfig.objectEligibleForCaching result.
         try {
             //Header[] headz = resp.getAllHeaders();
             //System.out.println("Printing headerz fo " +req.getRequestLine()+ " to "+ target);
@@ -88,7 +89,6 @@ public class Proxy extends HttpServlet {
             //System.out.println("----------------------------------------");
             //System.out.println(resp.getStatusLine());
             HttpEntity respEntity = resp.getEntity();
-            
             OutputStream out = response.getOutputStream();
             InputStream in = respEntity.getContent();
             IOUtils.copy(in,out);
@@ -110,11 +110,11 @@ public class Proxy extends HttpServlet {
      * @throws ServletException if a servlet-specific error occurs
      * @throws IOException if an I/O error occurs
      */
-    @Override
-    protected void doPost(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException {
-        //processRequest(request, response);
-    }
+//    @Override
+//    protected void doPost(HttpServletRequest request, HttpServletResponse response)
+//            throws ServletException, IOException {
+//        //processRequest(request, response);
+//    }
 
     /**
      * Returns a short description of the servlet.
