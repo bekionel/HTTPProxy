@@ -5,6 +5,8 @@
  */
 package com.bekionel.httpproxy;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -13,6 +15,7 @@ import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpHost;
@@ -39,7 +42,7 @@ public class Proxy extends HttpServlet {
      * @throws IOException if an I/O error occurs
      */
 
-            private static final Logger proxyLogger = Logger.getLogger("Proxy Submodule");
+    private static final Logger proxyLogger = Logger.getLogger("Proxy Submodule");
 
     /**
      * Handles the HTTP <code>GET</code> method.
@@ -55,11 +58,12 @@ public class Proxy extends HttpServlet {
         boolean eligibleForCaching = false;
         proxyLogger.debug("Entering doGet");
         String fullRequestUrl = "http://"+request.getHeader("Host")+request.getRequestURI();
+        String cacheLookupKey = request.getHeader("Host")+request.getRequestURI();
         String hostAddr = request.getHeader("Host");
         CloseableHttpClient httpclient = HttpClients.createDefault();
     try {
         HttpHost target = new HttpHost(hostAddr);
-            String requestString = request.getRequestURI().toString();
+            String requestString = request.getRequestURI();
             int dotIndex = requestString.lastIndexOf(".");
             if (dotIndex > 0){
             String extension = requestString.substring(dotIndex + 1);
@@ -69,7 +73,6 @@ public class Proxy extends HttpServlet {
                 proxyLogger.debug("Request string "+requestString+"\n Eligible for caching: "+ eligibleForCaching);
                 }
             }
-        //System.out.println(hostAddr+"\n"+fullRequestUrl+"\n");
         //Request to server starts here
         HttpGet req = new HttpGet(request.getRequestURI());
         proxyLogger.debug("Executing request " + req.toString() + " to " + target);
@@ -91,7 +94,33 @@ public class Proxy extends HttpServlet {
             HttpEntity respEntity = resp.getEntity();
             OutputStream out = response.getOutputStream();
             InputStream in = respEntity.getContent();
-            IOUtils.copy(in,out);
+            /*Caching logic starts here:
+              First check with eligibleForCaching if the object is of a type that can be cached.
+              Then check if the object already exists in cache with the existsInCache method.
+              If it exists, fetch it with fetchFromCache and write it to output stream,
+              else save it in cache and also write it to output stream.
+            */
+            if (eligibleForCaching){
+               if (CacheIndex.existsInCache(cacheLookupKey)){
+                   File fetchedFile = CacheIndex.fetchFromCache(cacheLookupKey);
+                   FileUtils.copyFile(fetchedFile, out);
+                   proxyLogger.debug("Object fetched from cache and copied to output stream");
+               }
+               else{
+                   FileOutputStream fos = new FileOutputStream(CacheIndex.addToCache(cacheLookupKey));
+                   byte[] buffer = new byte[1024];
+                   int len = in.read(buffer);
+                   while (len != -1 ) {
+                       out.write(buffer, 0, len);
+                       fos.write(buffer, 0, len);
+                       len = in.read(buffer);
+                   }
+                   proxyLogger.debug("Object copied to cache and copied to output stream");
+               }
+            }
+            else{
+                IOUtils.copy(in,out);
+            }
             in.close();
             out.close();
         } finally {
@@ -125,14 +154,5 @@ public class Proxy extends HttpServlet {
     public String getServletInfo() {
         return "Short description";
     }// </editor-fold>
-    
-    
-    
-    public CloseableHttpResponse sendGet(HttpGet httpGet) throws IOException {
-        
-                CloseableHttpClient httpClient = HttpClients.createDefault();
-                CloseableHttpResponse response = httpClient.execute(httpGet);
-                return response;
-	}
 
 }
